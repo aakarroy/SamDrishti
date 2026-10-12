@@ -117,8 +117,6 @@ Speech is output to the user's paired Bluetooth headset via PulseAudio/PipeWire 
 ```
 .
 |-- README.md                                # Project documentation and operational guide
-|-- SamDrishti (everything).md               # Hardware specifications, research notes, and design log
-|-- .gitignore                               # Specifies untracked cache and capture directories
 |-- run.py                                   # Active multi-process production vision and audio pipeline
 |
 |-- esp-codes/
@@ -157,20 +155,6 @@ Speech is output to the user's paired Bluetooth headset via PulseAudio/PipeWire 
 |   |-- model_convert.py                     # Exports Ultralytics PyTorch weights to NCNN format
 |   |-- photos.py                            # Captures dual synchronized chessboard images for calibration
 |
-|-- prev-versions/                           # Architecture iterations and modular testing scripts
-|   |-- esp_bluetooth.py                     # Standalone ESP32 serial bridge with priority speech dispatch
-|   |-- samdrishti_main.py                   # Shared memory multi-process vision + ESP32 integration
-|   |-- samdrishti_stable.py                 # Multi-process pipeline revision with persistent YOLO worker
-|   |-- stereo_yolo.py                       # Threaded camera capture with StereoBM and YOLO
-|   |-- yolo_inference.py                    # Subprocess helper for base64 frame stream inference
-|   |-- yolo_run.py                          # Monocular single-camera YOLO baseline test
-|   |-- yolo_stereo.py                       # StereoSGBM depth calculation with 3D point reprojection
-|   |-- yolo_stereo_2.py                     # Disparity profiling iteration
-|   |-- yolo_stereo_bluetooth.py             # Early threaded vision and Piper speech pipeline
-|
-`-- misc/                                    # Experimental benchmarks and test scripts
-    |-- ex.py                                # ROI-cropped disparity and threaded Piper speech test
-    `-- experiment.py                        # Multi-threaded Picamera2 + StereoSGBM profiling script
 ```
 
 ---

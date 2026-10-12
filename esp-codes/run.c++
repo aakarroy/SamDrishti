@@ -23,8 +23,8 @@ VL53L0X tofLeft;
 VL53L0X tofRight;
 SparkFun_VL53L5CX tofFront;
 
-const int MAX_DISTANCE = 200;    // 8 meters max limit
-int lastFrontDist = MAX_DISTANCE; // Memory for non-blocking 5CX
+const int MAX_DISTANCE = 2000;     // 2 meters max limit (corrected from 200mm)
+int lastFrontDist = MAX_DISTANCE; 
 
 // --- Motor & Haptic Configuration ---
 const int MOTOR_LEFT_PIN = 25; 
@@ -33,6 +33,10 @@ const int MOTOR_RIGHT_PIN = 26;
 const int PWM_FREQ = 1000;
 const int PWM_RESOLUTION = 8;     // 0-255
 const int PWM_40_PERCENT = 102;   // 40% of 255
+
+// Timing variables for non-blocking execution
+unsigned long lastSensorCheck = 0;
+const unsigned long SENSOR_INTERVAL_MS = 50; // Check sensors every 50ms
 
 // Helper to switch I2C channels on the TCA9548A
 void tcaSelect(uint8_t i) {
@@ -51,18 +55,15 @@ void setup() {
   // Initialize Radar
   RadarSerial.begin(RADAR_BAUD, SERIAL_8N1, RADAR_RX_PIN, RADAR_TX_PIN);
 
-  // Initialize Motors & Fix Default-On issue
+  // Initialize Motors (Compatible with modern ESP32 core versions)
   pinMode(MOTOR_LEFT_PIN, OUTPUT);
-  digitalWrite(MOTOR_LEFT_PIN, LOW);
-  ledcSetup(0, PWM_FREQ, PWM_RESOLUTION);
-  ledcAttachPin(MOTOR_LEFT_PIN, 0);
-  ledcWrite(0, 0); 
-
   pinMode(MOTOR_RIGHT_PIN, OUTPUT);
-  digitalWrite(MOTOR_RIGHT_PIN, LOW);
-  ledcSetup(1, PWM_FREQ, PWM_RESOLUTION);
-  ledcAttachPin(MOTOR_RIGHT_PIN, 1);
-  ledcWrite(1, 0);
+  
+  ledcAttach(MOTOR_LEFT_PIN, PWM_FREQ, PWM_RESOLUTION);
+  ledcAttach(MOTOR_RIGHT_PIN, PWM_FREQ, PWM_RESOLUTION);
+  
+  ledcWrite(MOTOR_LEFT_PIN, 0); 
+  ledcWrite(MOTOR_RIGHT_PIN, 0);
 
   // Initialize ToF Sensors via Multiplexer
   tcaSelect(0); // Port 0 for Left ToF
@@ -81,6 +82,8 @@ void setup() {
     tofFront.setRangingFrequency(15); 
     tofFront.startRanging();
   }
+  
+  Serial.println("🚀 SamDrishti Microcontroller Firmware Ready.");
 }
 
 void processRadarData() {
@@ -142,7 +145,7 @@ int getFront5CXMinDistance() {
 }
 
 void loop() {
-  // 1. Process mmWave
+  // 1. Non-blocking mmWave Packet Reader
   while (RadarSerial.available()) {
     uint8_t incomingByte = RadarSerial.read();
     if (rx_count >= MAX_FRAME_LEN) rx_count = 0;
@@ -151,59 +154,64 @@ void loop() {
     if (rx_count > 1 && rx_buf[rx_count - 2] == 0x55 && rx_buf[rx_count - 1] == 0xCC) {
       processRadarData();
       rx_count = 0; 
+    }
+  }
 
-      // 2. Logic Execution
-      if (radarOverride) {
-        Serial.print("OVERRIDE,APPROACHING,Dir:");
-        Serial.print(radarDirection);
-        Serial.print(",Dist:");
-        Serial.println(lastRadarDist);
+  // 2. Timed, Non-blocking Sensor & Haptic Control Loop
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastSensorCheck >= SENSOR_INTERVAL_MS) {
+    lastSensorCheck = currentMillis;
 
-        // Turn on both motors to 40%
-        ledcWrite(0, PWM_40_PERCENT);
-        ledcWrite(1, PWM_40_PERCENT);
-        
-      } else {
-        tcaSelect(0);
-        int distLeft = tofLeft.readRangeSingleMillimeters();
-        if (tofLeft.timeoutOccurred() || distLeft > MAX_DISTANCE) distLeft = MAX_DISTANCE;
+    if (radarOverride) {
+      Serial.print("OVERRIDE,APPROACHING,Dir:");
+      Serial.print(radarDirection);
+      Serial.print(",Dist:");
+      Serial.println(lastRadarDist);
 
-        tcaSelect(1);
-        int distRight = tofRight.readRangeSingleMillimeters();
-        if (tofRight.timeoutOccurred() || distRight > MAX_DISTANCE) distRight = MAX_DISTANCE;
+      // Turn on both motors to 40%
+      ledcWrite(MOTOR_LEFT_PIN, PWM_40_PERCENT);
+      ledcWrite(MOTOR_RIGHT_PIN, PWM_40_PERCENT);
+      
+    } else {
+      tcaSelect(0);
+      int distLeft = tofLeft.readRangeSingleMillimeters();
+      if (tofLeft.timeoutOccurred() || distLeft > MAX_DISTANCE) distLeft = MAX_DISTANCE;
 
-        int distFront = getFront5CXMinDistance();
+      tcaSelect(1);
+      int distRight = tofRight.readRangeSingleMillimeters();
+      if (tofRight.timeoutOccurred() || distRight > MAX_DISTANCE) distRight = MAX_DISTANCE;
 
-        int globalMin = distLeft;
-        String closestDir = "LEFT";
+      int distFront = getFront5CXMinDistance();
 
-        if (distRight < globalMin) {
-          globalMin = distRight;
-          closestDir = "RIGHT";
-        }
-        if (distFront < globalMin) {
-          globalMin = distFront;
-          closestDir = "FRONT";
-        }
+      int globalMin = distLeft;
+      String closestDir = "LEFT";
 
-        Serial.print("NORMAL,MinDist:");
-        Serial.print(globalMin);
-        Serial.print(",Dir:");
-        Serial.println(closestDir);
+      if (distRight < globalMin) {
+        globalMin = distRight;
+        closestDir = "RIGHT";
+      }
+      if (distFront < globalMin) {
+        globalMin = distFront;
+        closestDir = "FRONT";
+      }
 
-        if (globalMin >= MAX_DISTANCE) {
-          ledcWrite(0, 0); 
-          ledcWrite(1, 0); 
-        } else if (closestDir == "LEFT") {
-          ledcWrite(0, PWM_40_PERCENT); 
-          ledcWrite(1, 0);
-        } else if (closestDir == "RIGHT") {
-          ledcWrite(0, 0);
-          ledcWrite(1, PWM_40_PERCENT); 
-        } else if (closestDir == "FRONT") {
-          ledcWrite(0, PWM_40_PERCENT); 
-          ledcWrite(1, PWM_40_PERCENT); 
-        }
+      Serial.print("NORMAL,MinDist:");
+      Serial.print(globalMin);
+      Serial.print(",Dir:");
+      Serial.println(closestDir);
+
+      if (globalMin >= MAX_DISTANCE) {
+        ledcWrite(MOTOR_LEFT_PIN, 0); 
+        ledcWrite(MOTOR_RIGHT_PIN, 0); 
+      } else if (closestDir == "LEFT") {
+        ledcWrite(MOTOR_LEFT_PIN, PWM_40_PERCENT); 
+        ledcWrite(MOTOR_RIGHT_PIN, 0);
+      } else if (closestDir == "RIGHT") {
+        ledcWrite(MOTOR_LEFT_PIN, 0);
+        ledcWrite(MOTOR_RIGHT_PIN, PWM_40_PERCENT); 
+      } else if (closestDir == "FRONT") {
+        ledcWrite(MOTOR_LEFT_PIN, PWM_40_PERCENT); 
+        ledcWrite(MOTOR_RIGHT_PIN, PWM_40_PERCENT); 
       }
     }
   }
