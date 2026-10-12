@@ -12,6 +12,17 @@ The system fuses complementary sensory modalities:
 
 ---
 
+## Prototype Demonstration
+
+The smart walking stick prototype integrates stereo vision, multi-sensor detection, power management, and real-time processing directly on the cane structure.
+
+| Front View (Full Assembly) | Sensor Board & Microcontroller | Power System & Stepper/BMS |
+| :---: | :---: | :---: |
+| <img src="photos/IMG_20260307_131349.jpg" width="280" alt="Full Smart Cane Assembly" /> | <img src="photos/IMG_20260307_131606.jpg" width="280" alt="Sensor Board and Microcontroller" /> | <img src="photos/IMG_20260307_131631.jpg" width="280" alt="Battery, BMS and Power Regulation" /> |
+| **Stereo Camera and Sensor Head**<br>IMX219 binocular camera mounted at upper elevation, sensor hub, and central enclosure. | **Sensor Subsystem & ESP32**<br>Custom prototyping board hosting ESP32 controller, ToF sensors, and signal lines. | **Power & Battery Management**<br>Li-ion cells with 20A BMS, step-down voltage regulator with heatsink, and power switch. |
+
+---
+
 ## System Architecture and Workflow
 
 The system operates across two interconnected computing nodes: an ESP32 microcontroller and a Raspberry Pi 5 single-board computer.
@@ -113,12 +124,17 @@ Below is a breakdown of the active, non-ignored files and directories within thi
 |-- .gitignore                               # Specifies untracked cache and capture directories
 |-- new_yolo_stereo_bluetooth.py             # Active multi-process production vision and audio pipeline
 |
+|-- photos/                                  # Smart cane prototype demonstration photographs
+|   |-- IMG_20260307_131349.jpg              # Full assembly view with stereo camera and electronics
+|   |-- IMG_20260307_131606.jpg              # Close-up of ESP32 sensor board and mounting
+|   |-- IMG_20260307_131631.jpg              # Power regulation, step-down buck converter, and BMS
+|
 |-- audio/                                   # Pre-recorded alert audio files for low-latency playback
 |   |-- animal_alert.wav
 |   |-- bike_alert.wav
 |   |-- car_alert.wav
 |   |-- fast_alert.wav
-|   |-- knee_alert.wav
+|   |-- default_alert.wav
 |   |-- person_alert.wav
 |   |-- pothole_alert.wav
 |   |-- vehicle_alert.wav
@@ -193,117 +209,3 @@ pip install ultralytics ncnn pyserial
    ```
 4. Verify that the output calibration XML file (e.g., `stereo_calibration_7x7_filtered_final.xml`) is correctly referenced in the pipeline configuration.
 
-### Running the System
-
-#### 1. Vision and Stereo Pipeline (Standalone)
-Run the active multi-process pipeline:
-```bash
-python3 new_yolo_stereo_bluetooth.py
-```
-
-#### 2. ESP32 Hardware Bridge (Standalone Testing)
-Connect the ESP32 to the Raspberry Pi over USB (`/dev/ttyUSB0`):
-```bash
-python3 prev-versions/esp_bluetooth.py
-```
-
-#### 3. Full Integrated System (Vision + ESP32 Sensor Hub)
-Run the integrated shared-memory pipeline:
-```bash
-python3 prev-versions/samdrishti_main.py
-```
-
----
-
-## Suggested Repository Restructuring Plan
-
-The codebase currently contains calibration scripts, experimental versions, standalone bridges, and models at various directory levels. Below is an architectural plan proposing how the repository should be structured for modular development, clean separation of concerns, and open-source release.
-
-No files have been relocated yet; this plan outlines the target organization.
-
-```
-SamDrishti/
-|-- .gitignore
-|-- LICENSE
-|-- README.md
-|-- requirements.txt
-|-- pyproject.toml / setup.py
-|
-|-- config/                                  # Centralized configuration files
-|   |-- default_config.yaml                  # Frame rates, thresholds, scales, camera dimensions
-|   |-- hardware_pins.yaml                   # Serial port, baud rates, GPIO pin assignments
-|   `-- audio_alerts.yaml                    # Message templates, cooldown timings, priority levels
-|
-|-- firmware/                                # Microcontroller firmware
-|   `-- esp32/
-|       |-- platformio.ini                   # PlatformIO build configuration
-|       |-- src/
-|       |   |-- main.cpp                     # Sensor polling and JSON serialization loop
-|       |   |-- radar_rd03d.cpp              # Driver for Ai-Thinker RD-03D mmWave radar
-|       |   |-- tof_vl53l5cx.cpp             # Driver for VL53L5CX multizone ground sensor
-|       |   |-- tof_vl53l0x.cpp              # Driver for VL53L0X peripheral distance array
-|       |   |-- imu_mpu6050.cpp              # IMU pitch/roll filtering for cane tilt compensation
-|       |   `-- haptics.cpp                  # Motor vibration pattern controller
-|       `-- include/
-|           `-- config.h                     # Sensor thresholds, I2C addresses, and pins
-|
-|-- src/                                     # Raspberry Pi host application
-|   |-- __init__.py
-|   |-- main.py                              # Central process launcher and lifecycle manager
-|   |
-|   |-- vision/                              # Computer vision subsystem
-|   |   |-- __init__.py
-|   |   |-- camera.py                        # Picamera2 stereo capture abstractions
-|   |   |-- stereo_matcher.py                # Disparity calculation and 3D depth extraction
-|   |   |-- detector.py                      # YOLO NCNN model inference wrapper
-|   |   `-- tracker.py                       # Temporal depth smoothing and bounding box tracking
-|   |
-|   |-- bridge/                              # Serial and sensor bridge
-|   |   |-- __init__.py
-|   |   `-- esp32_serial.py                  # Background reader for ESP32 JSON telemetry
-|   |
-|   |-- audio/                               # Audio feedback and notification subsystem
-|   |   |-- __init__.py
-|   |   |-- audio_player.py                  # WAV playback engine (paplay/aplay wrapper)
-|   |   |-- tts_engine.py                    # Dynamic speech synthesis (Piper TTS interface)
-|   |   `-- priority_router.py               # Alert priority arbiter and cooldown manager
-|   |
-|   `-- utils/                               # Shared helper functions
-|       |-- __init__.py
-|       `-- shm_helper.py                    # Shared memory allocation and synchronization utilities
-|
-|-- assets/                                  # Static media and model assets
-|   |-- audio/                               # Pre-recorded alert sound files (.wav)
-|   |-- calibration/                         # Verified stereo calibration XML files
-|   `-- models/                              # Optimized NCNN model binaries (.bin, .param, .yaml)
-|
-|-- tools/                                   # Development, calibration, and training utilities
-|   |-- calibrate_stereo.py                  # Stereo calibration calculation script
-|   |-- capture_calibration_pairs.py         # Capture stereo images of calibration target
-|   |-- export_yolo_to_ncnn.py               # Ultralytics to NCNN model exporter
-|   `-- generate_audio_cues.py               # Batch audio clip generator
-|
-|-- docs/                                    # Technical documentation and guides
-|   |-- architecture.md                      # System architecture and multi-process design
-|   |-- hardware_wiring.md                   # Pinouts, power distribution, and PCB schematics
-|   |-- calibration_guide.md                 # Step-by-step camera calibration manual
-|   `-- protocol_specification.md            # ESP32 to Pi JSON communication protocol specification
-|
-|-- tests/                                   # Unit and hardware-in-the-loop tests
-|   |-- test_serial_parser.py
-|   |-- test_priority_engine.py
-|   `-- test_depth_math.py
-|
-`-- legacy/                                  # Archive of previous iterations
-    |-- samdrishti_main_v1.py
-    |-- yolo_stereo_bluetooth_v1.py
-    `-- experiments/
-```
-
-### Additional Recommended Files
-
-1. `requirements.txt`: Pin exact versions for `ultralytics`, `ncnn`, `pyserial`, `numpy`, and `opencv-python`.
-2. `config/default_config.yaml`: Externalize hardcoded values such as baseline distance, focal scaling, model paths, confidence thresholds, and audio cooldown intervals.
-3. `firmware/esp32/platformio.ini`: Provide reproducible dependency management for ESP32 libraries (e.g., SparkFun VL53L5CX, Adafruit VL53L0X, ElectronicCats MPU6050, ArduinoJson).
-4. `systemd/samdrishti.service`: Systemd service unit file to automatically boot the assistive software when the cane powers up on Raspberry Pi OS.
-5. `scripts/setup_bluetooth.sh`: Shell script to automate pairing and establishing the A2DP profile with the user's Bluetooth headset upon system startup.
