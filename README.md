@@ -114,16 +114,15 @@ Speech is output to the user's paired Bluetooth headset via PulseAudio/PipeWire 
 ---
 
 ## Codebase Map
-
-Below is a breakdown of the active, non-ignored files and directories within this repository:
-
 ```
 .
 |-- README.md                                # Project documentation and operational guide
 |-- SamDrishti (everything).md               # Hardware specifications, research notes, and design log
 |-- .gitignore                               # Specifies untracked cache and capture directories
-|-- new_yolo_stereo_bluetooth.py             # Active multi-process production vision and audio pipeline
+|-- run.py                                   # Active multi-process production vision and audio pipeline
 |
+|-- esp-codes/
+|   |-- run.c++                              # C++ code to run on esp to gather sensor data
 |-- photos/                                  # Smart cane prototype demonstration photographs
 |   |-- IMG_20260307_131349.jpg              # Full assembly view with stereo camera and electronics
 |   |-- IMG_20260307_131606.jpg              # Close-up of ESP32 sensor board and mounting
